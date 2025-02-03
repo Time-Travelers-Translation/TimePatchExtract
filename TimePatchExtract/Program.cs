@@ -47,33 +47,46 @@ namespace TimePatchExtract
                 Console.WriteLine();
                 Console.WriteLine($"The extracted files can be found in \"{Path.GetFullPath(outputFolder)}\".");
             }
+
+            if (args.Length < 3)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Press any key to close this application.");
+                Console.ReadKey();
+            }
         }
 
         private static void GetPathArguments(string[] args, out string gamePath, out string patchPath, out string outputPath)
         {
             // Get cia or 3ds game path
-            Console.WriteLine("Enter the path to the .3ds or .cia of Time Travelers:");
+            Console.WriteLine("Enter the file path to Time Travelers (.3ds or .cia):");
             Console.Write("> ");
 
             gamePath = args.Length > 0 ? args[0] : Console.ReadLine();
+            gamePath = gamePath?.Trim('"').Trim() ?? string.Empty;
+
             if (args.Length > 0)
                 Console.WriteLine(args[0]);
             Console.WriteLine();
 
             // Get patch file
-            Console.WriteLine("Enter the path to the patch file (.pat):");
+            Console.WriteLine("Enter the file path to the patch file (.pat):");
             Console.Write("> ");
 
             patchPath = args.Length > 1 ? args[1] : Console.ReadLine();
+            patchPath = patchPath?.Trim('"').Trim() ?? string.Empty;
+
             if (args.Length > 1)
                 Console.WriteLine(args[1]);
             Console.WriteLine();
 
             // Get output path
-            Console.WriteLine("Enter the directory, in which the patched files will be extracted to:");
+            Console.WriteLine("Enter any directory, in which the patched files will be extracted to:");
             Console.Write("> ");
 
             outputPath = args.Length > 2 ? args[2] : Console.ReadLine();
+            outputPath = outputPath?.Trim('"').Trim() ?? string.Empty;
+
             if (args.Length > 2)
                 Console.WriteLine(args[2]);
             Console.WriteLine();
@@ -81,11 +94,9 @@ namespace TimePatchExtract
         
         private static async Task<string> ApplyPatch(string gamePath, string patchPath, string outputPath)
         {
-            // Try to open patch file
-            if (!TryLoadPatch(patchPath, out PatchFile patchFile))
-                return null;
-
             // Try to open game
+            Console.Write("Opening game... ");
+
             var partitions = await LoadGamePartitions(gamePath);
             if (partitions == null)
                 return null;
@@ -116,11 +127,21 @@ namespace TimePatchExtract
 
             Stream cpkArchiveFileStream = await cpkArchiveFile.GetFileData();
 
-            if (!TryLoadCpkFiles(cpkArchiveFileStream, gamePath, out Cpk cpkState, out IList<IArchiveFileInfo> cpkFiles))
+            if (!TryLoadCpkFiles(cpkArchiveFileStream, gamePath, out _, out IList<IArchiveFileInfo> cpkFiles))
                 return null;
 
+            Console.WriteLine("Done");
+
+            // Try to open patch file
+            Console.Write("Opening patch file... ");
+
+            if (!TryLoadPatch(patchPath, out PatchFile patchFile))
+                return null;
+
+            Console.WriteLine("Done");
+
             // Extract patched files
-            Console.Write($"Extract patched files to {outputPath}...");
+            Console.Write($"Extract patched files to {outputPath}... ");
 
             var cpkOutputPath = Path.Combine(outputPath, "tt1_ctr");
             
@@ -160,10 +181,10 @@ namespace TimePatchExtract
                 await output.CopyToAsync(patchedFileOutputStream);
             }
 
-            Console.WriteLine(" Done");
+            Console.WriteLine("Done");
 
             // Apply code.bin patches
-            Console.Write("Apply patches to code.bin...");
+            Console.Write("Apply patches to code.bin... ");
 
             if (patchFile.HasPatch(".code"))
             {
@@ -200,10 +221,10 @@ namespace TimePatchExtract
                 }
             }
 
-            Console.WriteLine(" Done");
+            Console.WriteLine("Done");
 
             // Apply exheader.bin patches
-            Console.Write("Apply patches to exheader.bin...");
+            Console.Write("Apply patches to exheader.bin... ");
 
             if (patchFile.HasPatch("exheader.bin"))
             {
@@ -240,7 +261,7 @@ namespace TimePatchExtract
                 }
             }
 
-            Console.WriteLine(" Done");
+            Console.WriteLine("Done");
 
             return outputPath;
         }
@@ -310,6 +331,9 @@ namespace TimePatchExtract
             catch (Exception e)
             {
                 Console.WriteLine($"Could not load GameData.cxi from \"{gamePath}\". Error: {e.Message}");
+                Console.WriteLine();
+                Console.WriteLine("Make sure you use a decrypted .3ds or .cia!");
+
                 return false;
             }
         }
@@ -388,9 +412,10 @@ namespace TimePatchExtract
             catch (Exception e)
             {
                 Console.WriteLine($"Could not load file \"{fileStream.Name}\". Error: {e.Message}");
+                Console.WriteLine();
                 Console.WriteLine("Possible reasons could be that the file is not a .3ds or .cia, or is not decrypted.");
 
-                throw e;
+                return false;
             }
         }
 
